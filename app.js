@@ -7,13 +7,19 @@ const morgan = require("morgan");
 const cors = require("cors");
 const User = require("./models/userModel.js");
 const { generateOTP } = require("./utils/otpHelper.js");
-const { sendOtpEmail } = require("./utils/emailHelpers.js");
+const { sendOtpEmail, sendReminderMail } = require("./utils/emailHelpers.js");
 const OTP = require("./models/otpModel.js");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const Task = require("./models/taskModel.js");
 
+const cron = require("node-cron");
+cron.schedule('* * * * *', () => {
+    console.log('running a task every minute');
+
+    sendReminderMail("renusreemalapati@gmail.com", "Task 1");
+  });
 const app = express();
 
 app.get("/", (req, res) => {
@@ -52,7 +58,7 @@ app.get("/users", (req, res) => {
 
 app.post("/users/register", async (req, res) => {
     try {
-        const { email, password, otp } = req.body;
+        const { email, password, otp, fullName } = req.body;
 
         const otpDoc = await OTP.findOne({
             email: email,
@@ -82,6 +88,7 @@ app.post("/users/register", async (req, res) => {
         const newUser = await User.create({
             email,
             password: hashedPassword,
+            fullName,
         });
         res.status(201);
         res.json({
@@ -120,7 +127,7 @@ app.post("/users/register", async (req, res) => {
 });
 
 app.post("/otps", async (req, res) => {
-    const { email } = req.query;
+    const { email } = req.body;
     if (!email) {
         res.status(400).json({
             status: "fail",
@@ -279,8 +286,7 @@ app.post("/tasks", async (req, res) => {
         taskInfo.assignor=email;
         //console.log(taskInfo);
 
-        // 2. validate the data :: now mongoose does that
-        // 3. save the data in db :: MongoDB (online --> ATLAS) (offline is pain to setup :: in deployment we will mostly prefer online)
+        
         const newTask = await Task.create(taskInfo);
 
         res.status(201); //created
@@ -304,6 +310,56 @@ app.post("/tasks", async (req, res) => {
     }
 });
 
+app.get("/users/me", (req, res) => {
+    try {
+        const { email, fullName } = req.currUser;
+        res.status(200);
+        res.json({
+            status: "success",
+            data: {
+                user: {
+                    email,
+                    fullName,
+                },
+            },
+        });
+    } catch (err) {
+        console.log("error is GET /users/me", err.message);
+        res.status(500);
+        res.json({
+            status: "fail",
+            message: "INTERNAL SERVER ERROR",
+        });
+    }
+});
+
+app.get("/users/logout", (req, res) => {
+    res.clearCookie("authorization");
+    res.json({
+        status: "success",
+        message: "User is logged out",
+    });
+});
+
+app.get("/tasks", async (req, res) => {
+    try {
+        const taskList = (await Task.find()).forEach([{assignor: req.currUser.email},{assignee: req.currUser.email}]);
+        res.status(200);
+        res.json({
+            status: "success",
+            data: {
+                tasks: taskList,
+            },
+        });
+    } catch (err) {
+        console.log("error is GET /users/me", err.message);
+        res.status(500);
+        res.json({
+            status: "fail",
+            message: "INTERNAL SERVER ERROR",
+        });
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`server started on PORT: ${PORT}`);

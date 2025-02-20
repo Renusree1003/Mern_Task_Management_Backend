@@ -35,9 +35,19 @@ const sendOtpEmail = async (email, otp) => {
         `<p>your otp is <span style="color:brown">${otp}</span></p>`
     );
     return isEmailSent;
-
 };
 
-module.exports = {
-    sendOtpEmail,
+const sendReminderMail = async (email, task) => {
+    console.log("send otp email");
+    const isEmailSent = await sendEmail(
+        email,
+        "task reminder",
+        `<p>Tour task is pending ${task}</p>`
+    );
+    return isEmailSent;
 };
+
+    module.exports = {
+        sendOtpEmail,
+        sendReminderMail
+    };
